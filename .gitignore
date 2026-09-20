@@ -1,0 +1,11 @@
+# Frontend
+frontend/node_modules
+frontend/dist
+frontend/.env
+
+# Backend
+backend/*.exe
+backend/*.test
+
+# Editor / OS
+.DS_Store
