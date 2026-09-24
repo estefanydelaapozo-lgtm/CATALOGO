@@ -1,84 +1,106 @@
-import { useEffect, useState } from 'react';
-import { useCart, type Producto } from '../context/CartContext';
-import { getProductos } from '../services/api';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
+import { categorias, type Producto } from '../data/productos';
+import { getProductos } from '../services/productosService';
 
 const Catalogo = () => {
   const { addToCart } = useCart();
-
-  // Estados para consumir la API: datos, carga y error
   const [productos, setProductos] = useState<Producto[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
-  // Contador para poder reintentar la carga sin recargar la página
-  const [reintentos, setReintentos] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [busqueda, setBusqueda] = useState('');
+  const [categoria, setCategoria] = useState(searchParams.get('categoria') ?? 'Todas');
 
-  // GET /api/productos: se ejecuta al montar el componente y cada vez que se pulsa "Reintentar"
   useEffect(() => {
-    let cancelado = false; // evita actualizar el estado si el componente ya se desmontó
-
     getProductos()
       .then((data) => {
-        if (!cancelado) setProductos(data);
+        setProductos(data);
+        setLoading(false);
       })
-      .catch((err: unknown) => {
-        if (!cancelado) {
-          setError(err instanceof Error ? err.message : 'No se pudieron cargar los productos');
-        }
-      })
-      .finally(() => {
-        if (!cancelado) setLoading(false);
-      });
+      .catch(() => setLoading(false));
+  }, []);
 
-    return () => {
-      cancelado = true;
-    };
-  }, [reintentos]);
+  const productosFiltrados = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+    return productos.filter((prod) => {
+      const coincideCategoria = categoria === 'Todas' || prod.categoria === categoria;
+      const coincideTexto =
+        texto === '' ||
+        prod.nombre.toLowerCase().includes(texto) ||
+        prod.descripcion.toLowerCase().includes(texto);
+      return coincideCategoria && coincideTexto;
+    });
+  }, [productos, busqueda, categoria]);
 
-  const handleReintentar = () => {
-    setError('');
-    setLoading(true);
-    setReintentos((n) => n + 1);
+  const handleCategoriaChange = (value: string) => {
+    setCategoria(value);
+    if (value === 'Todas') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ categoria: value });
+    }
   };
+
+  if (loading) {
+    return <div className="text-center p-8">Cargando catálogo...</div>;
+  }
 
   return (
     <div>
-      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-6">Catálogo de Productos</h1>
+      <h1 className="text-2xl font-bold text-slate-800 mb-2">Catálogo de Productos</h1>
+      <p className="text-slate-500 mb-6">{productosFiltrados.length} producto(s) encontrado(s)</p>
 
-      {loading && (
-        <div className="bg-white p-8 rounded-lg border border-slate-200 shadow-sm text-center">
-          <p className="text-slate-500">Cargando productos...</p>
-        </div>
-      )}
+      <div className="flex flex-col md:flex-row gap-4 mb-8">
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar por nombre o descripción..."
+          className="flex-1 px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 outline-none transition"
+        />
+        <select
+          value={categoria}
+          onChange={(e) => handleCategoriaChange(e.target.value)}
+          className="px-4 py-3 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 outline-none transition"
+        >
+          <option value="Todas">Todas las categorías</option>
+          {categorias.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      {!loading && error && (
-        <div className="bg-red-50 text-red-600 p-6 rounded-lg border border-red-200 text-center">
-          <p className="mb-4">{error}</p>
+      {productosFiltrados.length === 0 ? (
+        <div className="bg-white p-10 rounded-lg border border-slate-200 text-center">
+          <p className="text-slate-500">No hay productos que coincidan con tu búsqueda.</p>
           <button
-            onClick={handleReintentar}
-            className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 transition"
+            onClick={() => {
+              setBusqueda('');
+              setCategoria('Todas');
+              setSearchParams({});
+            }}
+            className="mt-4 text-indigo-600 font-semibold hover:underline"
           >
-            Reintentar
+            Limpiar filtros
           </button>
         </div>
-      )}
-
-      {!loading && !error && productos.length === 0 && (
-        <div className="bg-white p-8 rounded-lg border border-slate-200 shadow-sm text-center">
-          <p className="text-slate-500">No hay productos disponibles.</p>
-        </div>
-      )}
-
-      {!loading && !error && productos.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {productos.map((prod) => (
-            <div
-              key={prod.id}
-              className="bg-white rounded-lg overflow-hidden border border-slate-200 shadow-sm flex flex-col"
-            >
-              <img src={prod.img} alt={prod.nombre} className="w-full h-40 object-cover" />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {productosFiltrados.map((prod) => (
+            <div key={prod.id} className="bg-white rounded-lg overflow-hidden border border-slate-200 shadow-sm flex flex-col">
+              <Link to={`/producto/${prod.id}`}>
+                <img src={prod.img} alt={prod.nombre} className="w-full h-40 object-cover hover:opacity-90 transition" />
+              </Link>
               <div className="p-4 flex flex-col flex-1">
-                <h3 className="font-semibold text-slate-700">{prod.nombre}</h3>
+                <p className="text-xs uppercase tracking-wide text-indigo-500 font-semibold">{prod.categoria}</p>
+                <Link to={`/producto/${prod.id}`}>
+                  <h3 className="font-semibold text-slate-700 hover:text-indigo-600 transition">{prod.nombre}</h3>
+                </Link>
                 <p className="text-indigo-600 font-bold mt-2 mb-4">${prod.precio.toFixed(2)}</p>
+
                 <button
                   onClick={() => addToCart(prod)}
                   className="mt-auto w-full bg-slate-900 text-white py-2 rounded text-sm hover:bg-indigo-600 transition"

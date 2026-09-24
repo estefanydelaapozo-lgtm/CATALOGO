@@ -3,7 +3,7 @@
 // Centraliza la URL base, los tipos de las respuestas y el manejo de errores,
 // para que los componentes solo llamen a funciones como loginRequest() o getProductos().
 
-import type { Producto } from '../context/CartContext';
+import type { Producto } from '../data/productos';
 
 // URL base de la API. Se puede sobreescribir con VITE_API_URL (archivo .env).
 // Por defecto usa el mismo host desde el que se abrió el frontend, en el puerto 3000 del backend;

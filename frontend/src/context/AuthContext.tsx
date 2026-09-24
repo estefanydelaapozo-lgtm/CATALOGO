@@ -1,11 +1,16 @@
-// src/context/AuthContext.tsx
 import { createContext, useContext, useState, type ReactNode } from 'react';
+
+export type Rol = 'admin' | 'cliente';
+
+export interface Usuario {
+  email: string;
+  rol: Rol;
+}
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  userEmail: string | null; // <-- estado para el correo
-  token: string | null; // <-- token que devuelve la API en POST /api/login
-  login: (email: string, token: string) => void; // <-- ahora recibe el correo y el token de la API
+  user: Usuario | null;
+  login: (usuario: Usuario) => void;
   logout: () => void;
 }
 
@@ -25,24 +30,17 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null); // <-- Estado local
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<Usuario | null>(null);
 
-  const login = (email: string, token: string) => {
+  const login = (usuario: Usuario) => {
     setIsAuthenticated(true);
-    setUserEmail(email); // Guardamos el correo
-    setToken(token); // Guardamos el token recibido del backend
+    setUser(usuario);
   };
 
   const logout = () => {
     setIsAuthenticated(false);
-    setUserEmail(null); // Limpiamos el correo al salir
-    setToken(null); // Y el token
+    setUser(null);
   };
 
-  return (
-    <AuthContext.Provider value={{ isAuthenticated, userEmail, token, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>{children}</AuthContext.Provider>;
 };

@@ -1,33 +1,40 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { loginRequest } from '../services/api';
+import { useAuth, type Rol } from '../context/AuthContext';
 
 const Login = () => {
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [error, setError] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
 
-    try {
-      // Llamada real a la API: POST /api/login con { email, password }
-      const data = await loginRequest(email, password);
-      login(data.email, data.token); // Guardamos correo y token en el estado global
-      navigate('/'); // Redirigimos al Dashboard
-    } catch (err) {
-      // 401 -> "Credenciales incorrectas"; sin conexión -> mensaje definido en services/api.ts
-      setError(err instanceof Error ? err.message : 'Ocurrió un error inesperado');
-    } finally {
-      setLoading(false);
-    }
+    fetch('http://localhost:3000/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('Credenciales incorrectas');
+        return response.json();
+      })
+      .then((data) => {
+        const rol: Rol = data.rol === 'admin' ? 'admin' : 'cliente';
+        login({ email: data.email, rol });
+        navigate(rol === 'admin' ? '/' : '/tienda');
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Ocurrió un error inesperado');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   return (
@@ -37,11 +44,13 @@ const Login = () => {
           <h2 className="text-3xl font-bold text-slate-900">MultiCatálogo</h2>
           <p className="text-slate-500 mt-2">Ingresa a tu cuenta para continuar</p>
         </div>
+
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-6 text-center border border-red-200">
             {error}
           </div>
         )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Correo Electrónico</label>
@@ -54,6 +63,7 @@ const Login = () => {
               required
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Contraseña</label>
             <input
@@ -65,14 +75,21 @@ const Login = () => {
               required
             />
           </div>
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Ingresando...' : 'Iniciar Sesión'}
+            {loading ? 'Validando...' : 'Iniciar Sesión'}
           </button>
         </form>
+
+        <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600 space-y-1">
+          <p className="font-semibold text-slate-700">Cuentas de prueba:</p>
+          <p>👑 Admin: <span className="font-mono">admin@upse.edu.ec / 123456</span></p>
+          <p>🛍️ Cliente: <span className="font-mono">cliente@upse.edu.ec / 123456</span></p>
+        </div>
       </div>
     </div>
   );
