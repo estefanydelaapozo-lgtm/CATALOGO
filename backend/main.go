@@ -67,6 +67,16 @@ func run() error {
 		return err
 	}
 
+	// Detalle del método de pago (tarjeta / voucher / datos de entrega).
+	if err := config.Migrate(db, "pago", database.MigracionPago); err != nil {
+		return err
+	}
+
+	// Más productos de ejemplo (idempotente: no duplica).
+	if err := config.Migrate(db, "mas_productos", database.MigracionMasProductos); err != nil {
+		return err
+	}
+
 	// Redis (Fase 3): si no está disponible, se inyecta un caché nulo y la API sigue
 	// funcionando (todas las lecturas van a PostgreSQL).
 	var cache repository.CacheRepository = repository.NopCache{}

@@ -67,13 +67,14 @@ func (m *MLMController) ComisionesMias(c *fiber.Ctx) error {
 
 // Liquidar POST /api/liquidaciones {referido_id}
 func (m *MLMController) Liquidar(c *fiber.Ctx) error {
+	// Puntero: el nodo raíz "Tú" tiene id 0, que es válido (distinto de "no enviado").
 	var body struct {
-		ReferidoID int `json:"referido_id"`
+		ReferidoID *int `json:"referido_id"`
 	}
-	if err := c.BodyParser(&body); err != nil || body.ReferidoID < 1 {
+	if err := c.BodyParser(&body); err != nil || body.ReferidoID == nil || *body.ReferidoID < 0 {
 		return SendError(c, fiber.StatusBadRequest, "Se requiere {\"referido_id\": N}", nil)
 	}
-	liq, err := m.repo.CrearLiquidacion(c.UserContext(), body.ReferidoID)
+	liq, err := m.repo.CrearLiquidacion(c.UserContext(), *body.ReferidoID)
 	if err != nil {
 		if strings.Contains(err.Error(), "no hay comisiones") {
 			return SendError(c, fiber.StatusBadRequest, err.Error(), nil)

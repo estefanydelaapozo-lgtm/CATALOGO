@@ -167,7 +167,9 @@ func (r *PostgresRepo) CrearLiquidacion(ctx context.Context, referidoID int) (mo
 // ListLiquidacionesAdmin historial de pagos.
 func (r *PostgresRepo) ListLiquidacionesAdmin(ctx context.Context) ([]models.Liquidacion, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT l.id, l.referido_id, COALESCE(r.nombre,''), l.total, l.estado, l.creado_en, l.pagada_en
+		`SELECT l.id, l.referido_id, COALESCE(r.nombre,''),
+		        COALESCE((SELECT u.email FROM usuarios u WHERE u.referido_id = l.referido_id ORDER BY u.id LIMIT 1),''),
+		        l.total, l.estado, l.creado_en, l.pagada_en
 		 FROM liquidaciones l LEFT JOIN referidos r ON r.id = l.referido_id
 		 ORDER BY l.id DESC`)
 	if err != nil {
@@ -177,7 +179,7 @@ func (r *PostgresRepo) ListLiquidacionesAdmin(ctx context.Context) ([]models.Liq
 	var out []models.Liquidacion
 	for rows.Next() {
 		var l models.Liquidacion
-		if err := rows.Scan(&l.ID, &l.ReferidoID, &l.Nombre, &l.Total, &l.Estado, &l.CreadoEn, &l.PagadaEn); err != nil {
+		if err := rows.Scan(&l.ID, &l.ReferidoID, &l.Nombre, &l.Email, &l.Total, &l.Estado, &l.CreadoEn, &l.PagadaEn); err != nil {
 			return nil, err
 		}
 		out = append(out, l)
@@ -214,7 +216,9 @@ func (r *PostgresRepo) ListLiquidacionesMias(ctx context.Context, referidoID int
 // ListDeudasPendientes suma comisiones pendiente por referido.
 func (r *PostgresRepo) ListDeudasPendientes(ctx context.Context) ([]models.DeudaReferido, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT r.id, r.nombre, COALESCE(r.codigo,''), COALESCE(SUM(c.monto),0)
+		`SELECT r.id, r.nombre,
+		        COALESCE((SELECT u.email FROM usuarios u WHERE u.referido_id = r.id ORDER BY u.id LIMIT 1),''),
+		        COALESCE(r.codigo,''), COALESCE(SUM(c.monto),0)
 		 FROM referidos r
 		 JOIN comisiones c ON c.referido_id = r.id AND c.estado='pendiente'
 		 GROUP BY r.id, r.nombre, r.codigo
@@ -227,7 +231,7 @@ func (r *PostgresRepo) ListDeudasPendientes(ctx context.Context) ([]models.Deuda
 	var out []models.DeudaReferido
 	for rows.Next() {
 		var d models.DeudaReferido
-		if err := rows.Scan(&d.ReferidoID, &d.Nombre, &d.Codigo, &d.Pendiente); err != nil {
+		if err := rows.Scan(&d.ReferidoID, &d.Nombre, &d.Email, &d.Codigo, &d.Pendiente); err != nil {
 			return nil, err
 		}
 		out = append(out, d)

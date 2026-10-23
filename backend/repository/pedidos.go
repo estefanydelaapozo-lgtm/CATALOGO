@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -66,11 +67,23 @@ func (r *PostgresRepo) CrearPedido(ctx context.Context, n models.NuevoPedido) (m
 		Cliente:    models.ClientePedido{Nombre: n.Cliente.Nombre, Email: n.Cliente.Email, Ciudad: n.Cliente.Ciudad},
 		Items:      []models.ItemPedido{},
 	}
+	// El voucher (data URL) va en su propia columna; el resto del detalle, como JSON.
+	comprobante := n.Pago.Comprobante
+	n.Pago.Comprobante = ""
+	detalleJSON, err := json.Marshal(n.Pago)
+	if err != nil {
+		return models.Pedido{}, err
+	}
+	var comprobanteSQL sql.NullString
+	if comprobante != "" {
+		comprobanteSQL = sql.NullString{String: comprobante, Valid: true}
+	}
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO pedidos (usuario_id, cliente_nombre, cliente_email, direccion, ciudad, telefono, metodo_pago, total)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, 0)
+		`INSERT INTO pedidos (usuario_id, cliente_nombre, cliente_email, direccion, ciudad, telefono, metodo_pago, detalle_pago, comprobante, total)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0)
 		 RETURNING id, numero, estado, created_at`,
 		n.UsuarioID, n.Cliente.Nombre, n.Cliente.Email, n.Cliente.Direccion, n.Cliente.Ciudad, n.Cliente.Telefono, n.MetodoPago,
+		detalleJSON, comprobanteSQL,
 	).Scan(&p.ID, &p.Numero, &p.Estado, &p.Fecha)
 	if err != nil {
 		return models.Pedido{}, err

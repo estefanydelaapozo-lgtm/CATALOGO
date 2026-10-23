@@ -127,6 +127,7 @@ type Liquidacion struct {
 	ID         int        `json:"id"`
 	ReferidoID int        `json:"referidoId"`
 	Nombre     string     `json:"nombre,omitempty"`
+	Email      string     `json:"email,omitempty"`
 	Total      float64    `json:"total"`
 	Estado     string     `json:"estado"`
 	CreadoEn   time.Time  `json:"creadoEn"`
@@ -137,6 +138,7 @@ type Liquidacion struct {
 type DeudaReferido struct {
 	ReferidoID int     `json:"referidoId"`
 	Nombre     string  `json:"nombre"`
+	Email      string  `json:"email"`
 	Codigo     string  `json:"codigo"`
 	Pendiente  float64 `json:"pendiente"`
 }
@@ -210,7 +212,31 @@ type ItemCheckout struct {
 type CheckoutRequest struct {
 	Cliente    ClienteCheckout `json:"cliente"`
 	MetodoPago string          `json:"metodoPago"`
+	Pago       *DetallePago    `json:"pago"`
 	Items      []ItemCheckout  `json:"items"`
+}
+
+// DetallePago agrupa los datos propios de cada método de pago.
+// SEGURIDAD: del pago con tarjeta NUNCA llegan el número completo ni el CVV; el navegador
+// solo envía titular, marca, últimos 4 dígitos y vencimiento.
+type DetallePago struct {
+	// Tarjeta de crédito
+	Titular     string `json:"titular,omitempty"`
+	Marca       string `json:"marca,omitempty"`
+	Ultimos4    string `json:"ultimos4,omitempty"`
+	Vencimiento string `json:"vencimiento,omitempty"` // MM/AA
+
+	// Transferencia bancaria
+	BancoOrigen       string `json:"bancoOrigen,omitempty"`
+	NumeroReferencia  string `json:"numeroReferencia,omitempty"`
+	ComprobanteNombre string `json:"comprobanteNombre,omitempty"`
+	Comprobante       string `json:"comprobante,omitempty"` // data URL (imagen o PDF); se guarda aparte
+
+	// Efectivo contra entrega
+	PagaCon       float64 `json:"pagaCon,omitempty"`
+	QuienRecibe   string  `json:"quienRecibe,omitempty"`
+	FranjaEntrega string  `json:"franjaEntrega,omitempty"`
+	Referencia    string  `json:"referencia,omitempty"` // indicaciones para el repartidor
 }
 
 // NuevoPedido es la petición ya validada y asociada al usuario autenticado (capa repository).
@@ -218,6 +244,7 @@ type NuevoPedido struct {
 	UsuarioID  int
 	Cliente    ClienteCheckout
 	MetodoPago string
+	Pago       DetallePago
 	Items      []ItemCheckout
 }
 

@@ -19,6 +19,8 @@ export const categorias = [
   "Crema",
   "Tónico",
   "Mascarilla",
+  "Limpiador",
+  "Solar",
   "Kit",
 ];
 

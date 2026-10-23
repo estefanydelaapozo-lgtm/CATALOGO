@@ -136,7 +136,8 @@ func (c *cacheFalso) DeleteByPrefix(_ context.Context, p string) error {
 // ---------- Utilidades ----------
 
 const cuerpoValido = `{"cliente":{"nombre":"Ana","email":"ana@x.com","direccion":"Calle 1","ciudad":"Quito","telefono":"099"},
-"metodoPago":"Tarjeta de crédito","items":[{"id":1,"cantidad":2}]}`
+"metodoPago":"Tarjeta de crédito","pago":{"titular":"Ana Perez","marca":"Visa","ultimos4":"4242","vencimiento":"12/40"},
+"items":[{"id":1,"cantidad":2}]}`
 
 func nuevaApp(repo repository.DBRepository, cache repository.CacheRepository) (*fiber.App, *CheckoutController) {
 	cc := NewCheckoutController(repo, cache)
@@ -256,5 +257,43 @@ func TestCheckout_ProductoInexistente400_StockInsuficiente409(t *testing.T) {
 	app, _ = nuevaApp(&repoFalso{errCrear: &repository.StockInsuficienteError{ID: 1, Nombre: "Serum", Disponible: 1, Solicitado: 2}}, &cacheFalso{})
 	if code, _ := post(t, app, "token-ok", cuerpoValido); code != 409 {
 		t.Fatalf("stock insuficiente: esperaba 409, obtuve %d", code)
+	}
+}
+
+func TestValidarPagoPorMetodo(t *testing.T) {
+	base := func(metodo string, pago *models.DetallePago) *models.CheckoutRequest {
+		return &models.CheckoutRequest{
+			Cliente:    models.ClienteCheckout{Nombre: "Ana", Email: "ana@x.com", Direccion: "Calle 1", Ciudad: "Quito", Telefono: "099"},
+			MetodoPago: metodo,
+			Pago:       pago,
+			Items:      []models.ItemCheckout{{ID: 1, Cantidad: 1}},
+		}
+	}
+	casos := []struct {
+		nombre string
+		req    *models.CheckoutRequest
+		campo  string // campo que debe fallar ("" = válido)
+	}{
+		{"sin pago", base("Tarjeta de crédito", nil), "pago"},
+		{"tarjeta ok", base("Tarjeta de crédito", &models.DetallePago{Titular: "Ana Perez", Marca: "Visa", Ultimos4: "4242", Vencimiento: "12/40"}), ""},
+		{"tarjeta vencida", base("Tarjeta de crédito", &models.DetallePago{Titular: "Ana Perez", Marca: "Visa", Ultimos4: "4242", Vencimiento: "01/20"}), "pago.vencimiento"},
+		{"transferencia sin voucher", base("Transferencia bancaria", &models.DetallePago{BancoOrigen: "Pichincha", NumeroReferencia: "123"}), "pago.comprobante"},
+		{"transferencia ok", base("Transferencia bancaria", &models.DetallePago{BancoOrigen: "Pichincha", NumeroReferencia: "123", ComprobanteNombre: "v.png", Comprobante: "data:image/png;base64,iVBORw0KGgo="}), ""},
+		{"transferencia con archivo no permitido", base("Transferencia bancaria", &models.DetallePago{BancoOrigen: "Pichincha", NumeroReferencia: "123", Comprobante: "data:text/html;base64,PGI+"}), "pago.comprobante"},
+		{"efectivo sin franja", base("Efectivo contra entrega", &models.DetallePago{QuienRecibe: "Ana", PagaCon: 50}), "pago.franjaEntrega"},
+		{"efectivo ok", base("Efectivo contra entrega", &models.DetallePago{QuienRecibe: "Ana", FranjaEntrega: "Tarde (12h-18h)", PagaCon: 50}), ""},
+	}
+	for _, c := range casos {
+		t.Run(c.nombre, func(t *testing.T) {
+			problemas := validarCheckout(c.req)
+			if c.campo == "" && len(problemas) > 0 {
+				t.Fatalf("se esperaba válido, hubo problemas: %v", problemas)
+			}
+			if c.campo != "" {
+				if _, ok := problemas[c.campo]; !ok {
+					t.Fatalf("se esperaba error en %q, hubo: %v", c.campo, problemas)
+				}
+			}
+		})
 	}
 }

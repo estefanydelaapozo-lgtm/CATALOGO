@@ -5,7 +5,7 @@ import { getProductos } from "../services/productosService";
 import { norm } from "../data/catalogos";
 import type { Producto } from "../data/productos";
 
-const POPULARES = ["Serum", "Retinol", "Hidratante", "Kit"];
+const POPULARES = ["Serum", "Retinol", "Hidratante", "Solar", "Kit"];
 
 const SearchSuggest = () => {
   const [q, setQ] = useState("");

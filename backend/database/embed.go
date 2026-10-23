@@ -18,6 +18,16 @@ var MigracionSeguridad string
 //go:embed 004_backoffice.sql
 var MigracionBackoffice string
 
+// MigracionPago columnas con el detalle del método de pago (idempotente).
+//
+//go:embed 005_pago.sql
+var MigracionPago string
+
+// MigracionMasProductos agrega productos adicionales al catálogo (idempotente).
+//
+//go:embed 006_mas_productos.sql
+var MigracionMasProductos string
+
 // InitSQL esquema base y datos semilla (usuarios, productos, referidos).
 // Solo se ejecuta automáticamente si la tabla usuarios aún no existe (BD nueva, ej. en Render).
 //

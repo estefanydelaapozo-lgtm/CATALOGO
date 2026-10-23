@@ -13,8 +13,8 @@ export interface Catalogo {
 
 export const catalogos: Catalogo[] = [
   { id: "todo", nombre: "Todo", lema: "Toda la colección", emoji: "✦", categorias: [], grad: "from-[#e6dfea] to-[#f3eef5]" },
-  { id: "glow", nombre: "Glow", lema: "Luminosidad y antiedad", emoji: "☀️", categorias: ["Serum", "Crema"], grad: "from-[#dfcbf0] to-rose-100" },
-  { id: "pure", nombre: "Pure", lema: "Limpieza y renovación", emoji: "🌿", categorias: ["Tónico", "Mascarilla"], grad: "from-[#c3e7f8] to-[#efe5f8]" },
+  { id: "glow", nombre: "Glow", lema: "Luminosidad y antiedad", emoji: "☀️", categorias: ["Serum", "Crema", "Solar"], grad: "from-[#dfcbf0] to-rose-100" },
+  { id: "pure", nombre: "Pure", lema: "Limpieza y renovación", emoji: "🌿", categorias: ["Tónico", "Mascarilla", "Limpiador"], grad: "from-[#c3e7f8] to-[#efe5f8]" },
   { id: "sets", nombre: "Sets", lema: "Rutinas y regalos", emoji: "🎁", categorias: ["Kit"], grad: "from-[#c9a6e4] to-[#e0f3fc]" },
 ];
 

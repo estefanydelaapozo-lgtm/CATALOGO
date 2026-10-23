@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log"
 	"net/mail"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +23,22 @@ var metodosPago = map[string]bool{
 	"Transferencia bancaria":  true,
 	"Efectivo contra entrega": true,
 }
+
+const (
+	metodoTarjeta       = "Tarjeta de crédito"
+	metodoTransferencia = "Transferencia bancaria"
+	metodoEfectivo      = "Efectivo contra entrega"
+
+	maxComprobanteChars = 2_800_000 // ~2 MB de archivo una vez codificado en base64
+)
+
+var (
+	reUltimos4     = regexp.MustCompile(`^\d{4}$`)
+	reVencimiento  = regexp.MustCompile(`^(0[1-9]|1[0-2])/(\d{2})$`)
+	reComprobante  = regexp.MustCompile(`^data:(image/(png|jpeg|webp)|application/pdf);base64,[A-Za-z0-9+/=]+$`)
+	franjasEntrega = map[string]bool{"Mañana (8h-12h)": true, "Tarde (12h-18h)": true, "Noche (18h-21h)": true}
+	marcasTarjeta  = map[string]bool{"Visa": true, "Mastercard": true, "American Express": true, "Diners Club": true, "Otra": true}
+)
 
 const (
 	maxItemsCarrito  = 50
@@ -75,6 +93,7 @@ func (cc *CheckoutController) Checkout(c *fiber.Ctx) error {
 		UsuarioID:  userID,
 		Cliente:    req.Cliente,
 		MetodoPago: req.MetodoPago,
+		Pago:       *req.Pago,
 		Items:      req.Items,
 	})
 	if err != nil {
@@ -195,6 +214,8 @@ func validarCheckout(req *models.CheckoutRequest) map[string]string {
 	}
 	if !metodosPago[req.MetodoPago] {
 		problemas["metodoPago"] = "Método de pago no soportado"
+	} else {
+		validarPago(req, problemas)
 	}
 
 	switch {
@@ -215,4 +236,82 @@ func validarCheckout(req *models.CheckoutRequest) map[string]string {
 		}
 	}
 	return problemas
+}
+
+// validarPago exige y normaliza los datos propios del método elegido, y descarta los de los demás
+// (así un pedido por transferencia nunca guarda, por ejemplo, datos de tarjeta).
+func validarPago(req *models.CheckoutRequest, problemas map[string]string) {
+	if req.Pago == nil {
+		problemas["pago"] = "Faltan los datos del método de pago"
+		req.Pago = &models.DetallePago{} // evita nil más adelante; el pedido no se procesa igual
+		return
+	}
+	in := req.Pago
+	out := models.DetallePago{}
+
+	switch req.MetodoPago {
+	case metodoTarjeta:
+		out.Titular = strings.TrimSpace(in.Titular)
+		out.Marca = strings.TrimSpace(in.Marca)
+		out.Ultimos4 = strings.TrimSpace(in.Ultimos4)
+		out.Vencimiento = strings.TrimSpace(in.Vencimiento)
+		if len(out.Titular) < 3 {
+			problemas["pago.titular"] = "El nombre del titular es obligatorio"
+		}
+		if !marcasTarjeta[out.Marca] {
+			problemas["pago.marca"] = "Marca de tarjeta no válida"
+		}
+		if !reUltimos4.MatchString(out.Ultimos4) {
+			problemas["pago.ultimos4"] = "Últimos 4 dígitos inválidos"
+		}
+		if m := reVencimiento.FindStringSubmatch(out.Vencimiento); m == nil {
+			problemas["pago.vencimiento"] = "El vencimiento debe tener el formato MM/AA"
+		} else {
+			mes, _ := strconv.Atoi(m[1])
+			anio, _ := strconv.Atoi(m[2])
+			ahora := time.Now()
+			if 2000+anio < ahora.Year() || (2000+anio == ahora.Year() && mes < int(ahora.Month())) {
+				problemas["pago.vencimiento"] = "La tarjeta está vencida"
+			}
+		}
+
+	case metodoTransferencia:
+		out.BancoOrigen = strings.TrimSpace(in.BancoOrigen)
+		out.NumeroReferencia = strings.TrimSpace(in.NumeroReferencia)
+		out.ComprobanteNombre = strings.TrimSpace(in.ComprobanteNombre)
+		out.Comprobante = strings.TrimSpace(in.Comprobante)
+		if out.BancoOrigen == "" {
+			problemas["pago.bancoOrigen"] = "Indica el banco desde el que transferiste"
+		}
+		if out.NumeroReferencia == "" {
+			problemas["pago.numeroReferencia"] = "El número de referencia o comprobante es obligatorio"
+		}
+		switch {
+		case out.Comprobante == "":
+			problemas["pago.comprobante"] = "Adjunta el voucher de la transferencia"
+		case len(out.Comprobante) > maxComprobanteChars:
+			problemas["pago.comprobante"] = "El voucher supera los 2 MB"
+		case !reComprobante.MatchString(out.Comprobante):
+			problemas["pago.comprobante"] = "El voucher debe ser una imagen (PNG, JPG, WEBP) o un PDF"
+		}
+
+	case metodoEfectivo:
+		out.QuienRecibe = strings.TrimSpace(in.QuienRecibe)
+		out.FranjaEntrega = strings.TrimSpace(in.FranjaEntrega)
+		out.Referencia = strings.TrimSpace(in.Referencia)
+		out.PagaCon = in.PagaCon
+		if out.QuienRecibe == "" {
+			problemas["pago.quienRecibe"] = "Indica quién recibirá el pedido"
+		}
+		if !franjasEntrega[out.FranjaEntrega] {
+			problemas["pago.franjaEntrega"] = "Elige una franja horaria de entrega"
+		}
+		if out.PagaCon <= 0 {
+			problemas["pago.pagaCon"] = "Indica con cuánto vas a pagar"
+		}
+		if len(out.Referencia) > 300 {
+			problemas["pago.referencia"] = "Las indicaciones son demasiado largas (máx. 300 caracteres)"
+		}
+	}
+	req.Pago = &out
 }
