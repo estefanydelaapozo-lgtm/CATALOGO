@@ -20,6 +20,7 @@ type Controllers struct {
 	MLM           *controllers.MLMController
 	Reportes      *controllers.ReportesController
 	Health        *controllers.HealthController
+	UsuariosAdmin *controllers.UsuariosAdminController
 }
 
 // SetupRoutes registra todas las rutas sobre la aplicación Fiber.
@@ -46,6 +47,7 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	app.Get("/api/liquidaciones/mias", auth, c.MLM.LiquidacionesMias)
 
 	// Admin
+	app.Get("/api/admin/usuarios", auth, admin, c.UsuariosAdmin.List)
 	app.Get("/api/admin/productos", auth, admin, c.ProductoAdmin.List)
 	app.Post("/api/productos", auth, admin, c.ProductoAdmin.Create)
 	app.Put("/api/productos/:id", auth, admin, c.ProductoAdmin.Update)

@@ -111,6 +111,7 @@ func run() error {
 		MLM:          controllers.NewMLMController(repo),
 		Reportes:     controllers.NewReportesController(repo),
 		Health:       controllers.NewHealthController(db, rdbClient),
+		UsuariosAdmin: controllers.NewUsuariosAdminController(repo),
 	}
 
 	// ErrorHandler global: todo error sale con el JSON estandarizado APIError.
