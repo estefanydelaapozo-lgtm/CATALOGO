@@ -141,6 +141,9 @@ type DeudaReferido struct {
 	Email      string  `json:"email"`
 	Codigo     string  `json:"codigo"`
 	Pendiente  float64 `json:"pendiente"`
+	// Cuántas comisiones componen la deuda y cuándo se generó la última.
+	NumComisiones  int        `json:"numComisiones"`
+	UltimaComision *time.Time `json:"ultimaComision,omitempty"`
 }
 
 // Pagina es el sobre estándar de listados paginados.

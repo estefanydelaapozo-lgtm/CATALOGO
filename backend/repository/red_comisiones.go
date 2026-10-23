@@ -9,6 +9,10 @@ import (
 	"multicatalogo-backend/models"
 )
 
+// sqlNombreDistribuidor: nombre a mostrar de un nodo (alias r = referidos).
+// El nodo raíz (id 0, "Tú") se muestra con el nombre real del administrador.
+const sqlNombreDistribuidor = `CASE WHEN r.id = 0 THEN COALESCE((SELECT NULLIF(u.nombre,'') FROM usuarios u WHERE u.referido_id = 0 ORDER BY u.id LIMIT 1),'Administrador (empresa)') ELSE r.nombre END`
+
 // GetRedDesde reconstruye el subárbol a partir de un nodo raíz (id del referido).
 func (r *PostgresRepo) GetRedDesde(ctx context.Context, raizID int) (models.Referido, error) {
 	rows, err := r.db.QueryContext(ctx,
@@ -155,7 +159,7 @@ func (r *PostgresRepo) CrearLiquidacion(ctx context.Context, referidoID int) (mo
 	}
 
 	var nombre string
-	_ = tx.QueryRowContext(ctx, `SELECT nombre FROM referidos WHERE id=$1`, referidoID).Scan(&nombre)
+	_ = tx.QueryRowContext(ctx, `SELECT `+sqlNombreDistribuidor+` FROM referidos r WHERE r.id=$1`, referidoID).Scan(&nombre)
 	liq.Nombre = nombre
 
 	if err := tx.Commit(); err != nil {
@@ -167,7 +171,7 @@ func (r *PostgresRepo) CrearLiquidacion(ctx context.Context, referidoID int) (mo
 // ListLiquidacionesAdmin historial de pagos.
 func (r *PostgresRepo) ListLiquidacionesAdmin(ctx context.Context) ([]models.Liquidacion, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT l.id, l.referido_id, COALESCE(r.nombre,''),
+		`SELECT l.id, l.referido_id, COALESCE(`+sqlNombreDistribuidor+`,''),
 		        COALESCE((SELECT u.email FROM usuarios u WHERE u.referido_id = l.referido_id ORDER BY u.id LIMIT 1),''),
 		        l.total, l.estado, l.creado_en, l.pagada_en
 		 FROM liquidaciones l LEFT JOIN referidos r ON r.id = l.referido_id
@@ -213,12 +217,12 @@ func (r *PostgresRepo) ListLiquidacionesMias(ctx context.Context, referidoID int
 	return out, rows.Err()
 }
 
-// ListDeudasPendientes suma comisiones pendiente por referido.
+// ListDeudasPendientes suma comisiones pendientes por referido (a quién se debe liquidar).
 func (r *PostgresRepo) ListDeudasPendientes(ctx context.Context) ([]models.DeudaReferido, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT r.id, r.nombre,
+		`SELECT r.id, `+sqlNombreDistribuidor+`,
 		        COALESCE((SELECT u.email FROM usuarios u WHERE u.referido_id = r.id ORDER BY u.id LIMIT 1),''),
-		        COALESCE(r.codigo,''), COALESCE(SUM(c.monto),0)
+		        COALESCE(r.codigo,''), COALESCE(SUM(c.monto),0), COUNT(c.id), MAX(c.created_at)
 		 FROM referidos r
 		 JOIN comisiones c ON c.referido_id = r.id AND c.estado='pendiente'
 		 GROUP BY r.id, r.nombre, r.codigo
@@ -231,7 +235,7 @@ func (r *PostgresRepo) ListDeudasPendientes(ctx context.Context) ([]models.Deuda
 	var out []models.DeudaReferido
 	for rows.Next() {
 		var d models.DeudaReferido
-		if err := rows.Scan(&d.ReferidoID, &d.Nombre, &d.Email, &d.Codigo, &d.Pendiente); err != nil {
+		if err := rows.Scan(&d.ReferidoID, &d.Nombre, &d.Email, &d.Codigo, &d.Pendiente, &d.NumComisiones, &d.UltimaComision); err != nil {
 			return nil, err
 		}
 		out = append(out, d)

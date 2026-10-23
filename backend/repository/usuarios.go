@@ -47,6 +47,17 @@ func (r *PostgresRepo) RegistrarUsuario(ctx context.Context, nombre, email, pass
 		}
 		parentID = sql.NullInt64{Int64: int64(pid), Valid: true}
 		nivel = parentNivel + 1
+	} else {
+		// Sin código de referido: el usuario se une directo a la empresa (nodo raíz id 0),
+		// así sus compras generan comisión para la raíz y queda dentro de la red.
+		var rootNivel int
+		err = tx.QueryRowContext(ctx, `SELECT nivel FROM referidos WHERE id = 0`).Scan(&rootNivel)
+		if err == nil {
+			parentID = sql.NullInt64{Int64: 0, Valid: true}
+			nivel = rootNivel + 1
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return models.Usuario{}, err
+		}
 	}
 
 	codigo := generarCodigo(nombre, email)

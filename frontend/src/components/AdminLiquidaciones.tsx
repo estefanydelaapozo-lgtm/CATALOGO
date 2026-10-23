@@ -8,6 +8,8 @@ interface Deuda {
   email?: string;
   codigo: string;
   pendiente: number;
+  numComisiones: number;
+  ultimaComision?: string;
 }
 
 interface Liquidacion {
@@ -98,6 +100,10 @@ const AdminLiquidaciones = () => {
             <p className="text-sm text-[#7d6f87]">
               Distribuidores con saldo acumulado listo para corte y liquidación
             </p>
+            <p className="text-xs text-[#7d6f87] mt-1">
+              Cada compra de un usuario genera comisión para quienes lo invitaron (nivel 1: 10 %, nivel 2: 5 %,
+              nivel 3: 2 %). A cada uno se le liquida lo acumulado en sus comisiones pendientes.
+            </p>
           </div>
           <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1.5 rounded-full">
             {deudas.length} {deudas.length === 1 ? 'distribuidor pendiente' : 'distribuidores pendientes'}
@@ -116,6 +122,8 @@ const AdminLiquidaciones = () => {
                   <th className={th}>ID Distribuidor</th>
                   <th className={th}>Nombre</th>
                   <th className={th}>Email</th>
+                  <th className={`${th} text-center`}>Comisiones</th>
+                  <th className={th}>Última</th>
                   <th className={`${th} text-right`}>Saldo pendiente</th>
                   <th className={`${th} text-center`}>Acción</th>
                 </tr>
@@ -126,6 +134,8 @@ const AdminLiquidaciones = () => {
                     <td className="px-5 py-4 text-[#6b7a90]">#{d.referidoId}</td>
                     <td className="px-5 py-4 font-semibold text-[#1f1727]">{d.nombre}</td>
                     <td className="px-5 py-4 text-[#6b7a90]">{d.email || '—'}</td>
+                    <td className="px-5 py-4 text-center text-[#6b7a90]">{d.numComisiones}</td>
+                    <td className="px-5 py-4 text-[#6b7a90]">{fechaHora(d.ultimaComision)}</td>
                     <td className="px-5 py-4 text-right font-bold text-amber-600">{dinero(d.pendiente)}</td>
                     <td className="px-5 py-4 text-center">
                       <button
