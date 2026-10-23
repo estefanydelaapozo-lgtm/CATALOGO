@@ -50,3 +50,59 @@ export function registerSW(): void {
 export function aplicarActualizacion(): void {
   waitingWorker?.postMessage({ type: "SKIP_WAITING" });
 }
+
+
+// ---------- Instalación (botón "Instalar") ----------
+// El navegador dispara `beforeinstallprompt` una sola vez y puede hacerlo ANTES de que React
+// monte los componentes; por eso se captura aquí, a nivel de módulo, y se guarda.
+export const EVT_INSTALL = "pwa:install-state";
+
+// Evento no estándar de Chromium (no está en lib.dom)
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+}
+
+let eventoInstalacion: BeforeInstallPromptEvent | null = null;
+
+const avisarInstalacion = () => window.dispatchEvent(new CustomEvent(EVT_INSTALL));
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault(); // guardamos el evento para lanzarlo desde nuestro botón
+  eventoInstalacion = e as BeforeInstallPromptEvent;
+  avisarInstalacion();
+});
+
+window.addEventListener("appinstalled", () => {
+  eventoInstalacion = null;
+  avisarInstalacion();
+});
+
+export function puedeInstalar(): boolean {
+  return eventoInstalacion !== null;
+}
+
+// ¿Ya se está usando como app instalada? (Android/escritorio o iOS "pantalla de inicio")
+export function yaInstalada(): boolean {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
+// iPhone/iPad (incluye iPadOS, que se identifica como Mac con pantalla táctil)
+export function esIOS(): boolean {
+  const ua = navigator.userAgent;
+  return /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+}
+
+// Lanza el diálogo de instalación del sistema. Devuelve true si el usuario aceptó.
+export async function instalarApp(): Promise<boolean> {
+  if (!eventoInstalacion) return false;
+  const evt = eventoInstalacion;
+  await evt.prompt();
+  const { outcome } = await evt.userChoice;
+  eventoInstalacion = null; // el evento solo se puede usar una vez
+  avisarInstalacion();
+  return outcome === "accepted";
+}

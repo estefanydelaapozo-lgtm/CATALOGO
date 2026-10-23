@@ -4,6 +4,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import SearchSuggest from "./SearchSuggest";
 import Logo from "./Logo";
+import InstalarPwa from "./InstalarPwa";
 
 interface NavbarProps { toggleSidebar: () => void }
 
@@ -24,6 +25,8 @@ const Navbar = ({ toggleSidebar }: NavbarProps) => {
         <Link to="/tienda" className="hidden sm:block"><Logo /></Link>
 
         <div className="flex-1 flex justify-center"><SearchSuggest /></div>
+
+        <InstalarPwa />
 
         <Link to="/carrito" aria-label="Carrito" className="relative p-2 rounded-full hover:bg-[#e6dfea]/70 transition">
           <svg className="w-6 h-6 text-[#473d52]" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 8h12l-1 11H7L6 8zM9 8a3 3 0 016 0" /></svg>
