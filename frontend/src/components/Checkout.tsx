@@ -71,6 +71,10 @@ const formatearVencimiento = (v: string): string => {
   return n.length > 2 ? `${n.slice(0, 2)}/${n.slice(2)}` : n;
 };
 
+// Modo pruebas: por defecto NO se exige Luhn, así sirve cualquier número inventado.
+// Para exigir tarjetas reales/válidas, define VITE_VALIDAR_LUHN=true en frontend/.env y reconstruye.
+const VALIDAR_LUHN = import.meta.env.VITE_VALIDAR_LUHN === "true";
+
 // Algoritmo de Luhn: detecta números de tarjeta mal digitados
 const luhnValido = (numero: string): boolean => {
   const n = soloDigitos(numero);
@@ -157,7 +161,8 @@ const Checkout = () => {
   const validarPago = (): string => {
     if (datos.metodoPago === TARJETA) {
       if (tarjeta.titular.trim().length < 3) return "Escribe el nombre del titular de la tarjeta";
-      if (!luhnValido(tarjeta.numero)) return "El número de la tarjeta no es válido";
+      if (VALIDAR_LUHN && !luhnValido(tarjeta.numero)) return "El número de la tarjeta no es válido";
+      if (!VALIDAR_LUHN && soloDigitos(tarjeta.numero).length < 13) return "El número de la tarjeta es muy corto (mínimo 13 dígitos)";
       if (!vencimientoValido(tarjeta.vencimiento)) return "El vencimiento no es válido o la tarjeta está vencida (MM/AA)";
       const largoCvv = detectarMarca(tarjeta.numero) === "American Express" ? 4 : 3;
       if (soloDigitos(tarjeta.cvv).length !== largoCvv) return `El CVV debe tener ${largoCvv} dígitos`;
