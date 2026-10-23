@@ -1,111 +1,51 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext';
-import { useLayout } from '../context/LayoutContext';
-import { CartIcon, LogoutIcon, MenuIcon } from './Icons';
+// Cabecera: menú, marca, buscador con sugerencias, carrito, usuario y selector de catálogo.
+import { Link, useNavigate } from "react-router-dom";
+import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
+import SearchSuggest from "./SearchSuggest";
+import Logo from "./Logo";
 
-const Navbar = () => {
+interface NavbarProps { toggleSidebar: () => void }
+
+const Navbar = ({ toggleSidebar }: NavbarProps) => {
   const { totalItems } = useCart();
-  const { logout, userEmail } = useAuth();
-  const { toggleSidebar } = useLayout();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
-
-  // Menú de usuario: se abre con clic/toque (el "hover" no existe en celulares)
-  const [menuOpen, setMenuOpen] = useState<boolean>(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const cerrarSiEsFuera = (e: MouseEvent | TouchEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', cerrarSiEsFuera);
-    document.addEventListener('touchstart', cerrarSiEsFuera);
-    return () => {
-      document.removeEventListener('mousedown', cerrarSiEsFuera);
-      document.removeEventListener('touchstart', cerrarSiEsFuera);
-    };
-  }, []);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const salir = () => { logout(); navigate("/login"); };
 
   return (
-    <header className="h-16 shrink-0 bg-white border-b border-slate-200 flex items-center justify-between gap-2 px-4 md:px-8">
-      <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-        {/* Botón de Toggle: colapsa/expande el Sidebar (en móvil abre/cierra el panel) */}
-        <button
-          onClick={toggleSidebar}
-          className="p-2 rounded-full hover:bg-slate-100 transition text-slate-600"
-          title="Mostrar u ocultar menú"
-          aria-label="Mostrar u ocultar menú"
-        >
-          <MenuIcon className="w-6 h-6" />
+    <header className="relative z-40 bg-[#faf6fc]/90 backdrop-blur-md border-b border-[#e6dfea]/70">
+      <div className="h-16 px-4 md:px-8 flex items-center gap-3 md:gap-6">
+        <button onClick={toggleSidebar} aria-label="Alternar menú" className="p-2 -ml-2 rounded-full hover:bg-[#e6dfea]/70 text-[#473d52] transition">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h10M4 17h16" />
+          </svg>
         </button>
-        <h2 className="text-slate-600 font-medium text-base md:text-lg truncate">
-          Panel de Administración
-        </h2>
-      </div>
+        <Link to="/tienda" className="hidden sm:block"><Logo /></Link>
 
-      <div className="flex items-center gap-3 sm:gap-6 shrink-0">
-        <Link
-          to="/carrito"
-          className="relative p-2 hover:bg-slate-100 rounded-full transition text-slate-600"
-          aria-label="Carrito de compras"
-        >
-          <CartIcon className="w-6 h-6" />
+        <div className="flex-1 flex justify-center"><SearchSuggest /></div>
+
+        <Link to="/carrito" aria-label="Carrito" className="relative p-2 rounded-full hover:bg-[#e6dfea]/70 transition">
+          <svg className="w-6 h-6 text-[#473d52]" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 8h12l-1 11H7L6 8zM9 8a3 3 0 016 0" /></svg>
           {totalItems > 0 && (
-            <span className="absolute top-0 right-0 bg-indigo-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full transform translate-x-1 -translate-y-1">
+            <span className="absolute -top-0.5 -right-0.5 bg-[#82285f] text-white text-[11px] font-bold min-w-5 h-5 px-1 flex items-center justify-center rounded-full">
               {totalItems}
             </span>
           )}
         </Link>
 
-        <div className="flex items-center gap-4">
-          {/* El correo se oculta en pantallas pequeñas (aparece dentro del menú de usuario) */}
-          <span className="hidden md:inline text-sm text-slate-500">{userEmail}</span>
-
-          <div ref={menuRef} className="relative">
-            {/* Círculo del usuario / Avatar */}
-            <button
-              onClick={() => setMenuOpen((prev) => !prev)}
-              className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 flex items-center justify-center"
-              aria-label="Menú de usuario"
-              aria-expanded={menuOpen}
-            >
-              {/*
-                NOTA PARA LA API:
-                Aquí reemplazarás el 'src' quemado por la variable de tu estado,
-                por ejemplo: src={userAvatar || defaultImage}
-              */}
-              <img
-                src="https://fastly.picsum.photos/id/64/4326/2884.jpg?hmac=9_SzX666YRpR_fOyYStXpfSiJ_edO3ghlSRnH2w09Kg"
-                alt="Avatar del usuario"
-                className="w-full h-full object-cover"
-              />
-            </button>
-
-            {/* Menú desplegable */}
-            <div
-              className={`absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg transition-all duration-200 z-50 ${
-                menuOpen ? 'opacity-100 visible' : 'opacity-0 invisible'
-              }`}
-            >
-              <p className="md:hidden px-4 py-2 text-xs text-slate-500 truncate border-b border-slate-100">
-                {userEmail}
-              </p>
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-md transition-colors"
-              >
-                <LogoutIcon className="w-4 h-4" />
-                Cerrar Sesión
-              </button>
+        <div className="relative group pb-2 -mb-2">
+          <button className="w-9 h-9 rounded-full bg-[#1f1727] text-white font-semibold text-sm uppercase flex items-center justify-center" aria-label="Menú de usuario">
+            {user?.email?.[0] ?? "?"}
+          </button>
+          <div className="absolute right-0 top-full w-56 bg-white ring-1 ring-[#e6dfea] rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition z-50 overflow-hidden">
+            <div className="px-4 py-3 border-b border-[#f3eef5]">
+              <p className="text-sm font-semibold text-[#31283b] truncate">{user?.email}</p>
+              <p className="text-xs uppercase tracking-wide text-[#82285f] font-semibold">{user?.rol}</p>
             </div>
+            <button onClick={salir} className="w-full text-left px-4 py-2.5 text-sm font-semibold text-[#473d52] hover:bg-[#f8f3fc] transition">
+              Cerrar sesión
+            </button>
           </div>
         </div>
       </div>

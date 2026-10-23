@@ -1,0 +1,66 @@
+# Infraestructura de MultiCatálogo.  Uso:  docker compose up -d
+#   - db    : PostgreSQL 16 (fuente de verdad) -> en tu PC escucha en el puerto 5433
+#   - redis : Redis (caché Cache-Aside, Fase 3)
+#   - backend (opcional, perfil "full"): la API Go dentro de Docker.
+#       docker compose --profile full up -d --build
+#     Sin el perfil, la API se ejecuta en tu máquina con `go run .` (flujo habitual de clase).
+# Las credenciales se leen del archivo .env (con valores por defecto si no existe).
+services:
+  db:
+    image: postgres:16
+    container_name: multicatalogo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-multicatalogo}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-multicatalogo123}
+      POSTGRES_DB: ${DB_NAME:-multicatalogo}
+    ports:
+      # puerto de TU PC : puerto interno del contenedor (siempre 5432)
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Se ejecuta SOLO la primera vez (cuando el volumen está vacío)
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-multicatalogo} -d ${DB_NAME:-multicatalogo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:alpine
+    container_name: multicatalogo-redis
+    restart: unless-stopped
+    # Es un caché: sin persistencia en disco y con tope de memoria (descarta lo menos usado).
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    profiles: ["full"]
+    build: .
+    container_name: multicatalogo-api
+    restart: unless-stopped
+    environment:
+      # Dentro de la red de Docker los servicios se alcanzan por su nombre, no por localhost.
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    # La API arranca solo cuando PostgreSQL y Redis ya responden.
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:

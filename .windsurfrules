@@ -1,0 +1,38 @@
+# Contexto del Proyecto: MultiCatálogo (Unidad 2)
+Actúas como desarrollador backend Senior en Go. Core transaccional de un SaaS multitenant con Go + Fiber.
+Frontend React (Vite + Tailwind) ya finalizado, consume la API en el puerto 3000. Se modifica SOLO el backend (`backend/`), salvo ajustes mínimos del frontend para mostrar resultados.
+
+## Reglas Arquitectónicas
+1. Separación de responsabilidades: `routes` define endpoints, `controllers` maneja HTTP, `models` define estructuras, `repository` maneja los datos.
+2. Todas las respuestas de error usan `models.APIError {status, message, details}` vía `controllers.SendError`.
+3. Prohibido cambiar las firmas de endpoints existentes (`/api/login`, `/api/productos`, `/api/red`) o la forma de los JSON que el frontend ya espera. Solo se permiten campos adicionales.
+
+## Navegación
+- NUNCA hagas escaneos recursivos ni leas carpetas completas. Consulta primero `PROJECT_MAP.md` para ubicar el archivo exacto antes de leer código.
+
+## Seguimiento de tareas
+- Al iniciar cualquier sesión o tarea, lee PRIMERO `REQUIREMENTS_CHECKLIST.md` para conocer el estado y qué falta por implementar. No explores el código para adivinar el progreso.
+
+## Actualización continua
+- Cada vez que completes una tarea, prueba o endpoint con éxito, actualiza inmediatamente `REQUIREMENTS_CHECKLIST.md` marcando la casilla correspondiente (`- [x]`) y actualizando la sección "Estado General".
+- Si cambian rutas, archivos o endpoints, actualiza también `PROJECT_MAP.md`.
+
+## Ahorro de tokens
+- Lee únicamente los archivos que vas a modificar de forma puntual.
+- Prohibido reescribir archivos enteros si solo cambia una función.
+
+## Directivas de Ahorro de Tokens (MCP)
+### Uso de Playwright
+- NUNCA tomes capturas de pantalla ni pidas el DOM completo/HTML de la página.
+- Extrae únicamente el texto visible o el selector CSS puntual del elemento que se está testeando.
+- Para verificar APIs o respuestas JSON, usa peticiones HTTP directas en lugar de abrir el navegador.
+
+### Uso de Memory
+- Guarda en memoria persistente ÚNICAMENTE:
+  1. Causa raíz y solución final de errores de configuración o entorno recurrentes.
+  2. Puertos locales y variables clave del proyecto.
+- PROHIBIDO guardar código fuente completo, trazas de error (stack traces) o historial de chat.
+
+### Manejo de Errores y Pruebas
+- Si una prueba falla, ejecuta SOLO ese test individual, nunca la suite completa.
+- Si el mismo error persiste tras 2 intentos de solución, DETENTE y explica la hipótesis conceptual antes de editar más archivos.

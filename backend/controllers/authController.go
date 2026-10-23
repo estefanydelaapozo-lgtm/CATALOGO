@@ -1,30 +1,70 @@
-// Declaramos el paquete controllers para agrupar las funciones que manejan la lógica de negocio de las rutas.
+// Paquete controllers: lógica HTTP (request/response). No contiene datos, los pide al repository.
 package controllers
 
 import (
-	// Importamos el framework Fiber para tener acceso al contexto (c *fiber.Ctx) de la petición HTTP.
+	"errors"
+	"net/mail"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
-	// Importamos nuestro paquete de modelos para poder usar la estructura LoginRequest.
+
+	"multicatalogo-backend/auth"
 	"multicatalogo-backend/models"
+	"multicatalogo-backend/repository"
 )
 
-// Login es la función controladora que se ejecutará cuando el cliente envíe sus credenciales.
-func Login(c *fiber.Ctx) error {
-	// Creamos una variable 'req' del tipo LoginRequest (ubicada en nuestro paquete models) para almacenar los datos.
+// AuthController depende de la INTERFAZ DBRepository (inyección de dependencias).
+type AuthController struct {
+	repo repository.DBRepository
+}
+
+func NewAuthController(repo repository.DBRepository) *AuthController {
+	return &AuthController{repo: repo}
+}
+
+// Login valida la entrada y autentica contra el repositorio.
+//
+//	400 -> JSON inválido o campos vacíos / email mal formado
+//	401 -> credenciales incorrectas
+//	500 -> falla de la base de datos
+//	200 -> {token, email, rol}  (token = JWT HS256 real, TTL 2h)
+func (a *AuthController) Login(c *fiber.Ctx) error {
 	var req models.LoginRequest
-	
-	// Intentamos parsear (transformar) el cuerpo JSON entrante y guardarlo en la variable 'req'.
 	if err := c.BodyParser(&req); err != nil {
-		// Si ocurre un error al parsear (ej. JSON mal formado), retornamos un estado HTTP 400 (Bad Request).
-		return c.Status(400).JSON(fiber.Map{"error": "Cuerpo de petición inválido"})
+		return SendError(c, fiber.StatusBadRequest, "Cuerpo de petición inválido", "Se esperaba un JSON con email y password")
 	}
 
-	// Evaluamos si el email y la contraseña coinciden con las credenciales predefinidas.
-	if req.Email == "admin@upse.edu.ec" && req.Password == "123456" {
-		// Si coinciden, retornamos un estado HTTP 200 (por defecto) enviando un JSON con un token ficticio y el correo.
-		return c.JSON(fiber.Map{"token": "fake-jwt-token-123", "email": req.Email})
+	req.Email = strings.TrimSpace(req.Email)
+
+	// Validación explícita de campos, acumulando todos los problemas encontrados.
+	problemas := map[string]string{}
+	if req.Email == "" {
+		problemas["email"] = "El email es obligatorio"
+	} else if _, err := mail.ParseAddress(req.Email); err != nil {
+		problemas["email"] = "El formato del email no es válido"
 	}
-	
-	// Si las credenciales son incorrectas, retornamos un estado HTTP 401 (No autorizado) con un mensaje de error.
-	return c.Status(401).JSON(fiber.Map{"error": "Credenciales incorrectas"})
+	if req.Password == "" {
+		problemas["password"] = "La contraseña es obligatoria"
+	}
+	if len(problemas) > 0 {
+		return SendError(c, fiber.StatusBadRequest, "Datos de inicio de sesión inválidos", problemas)
+	}
+
+	usuario, ok, err := a.repo.FindUsuario(c.UserContext(), req.Email, req.Password)
+	if err != nil {
+		if errors.Is(err, repository.ErrCuentaDesactivada) {
+			return SendError(c, fiber.StatusForbidden, "Cuenta desactivada", nil)
+		}
+		return dbError(c, err)
+	}
+	if !ok {
+		return SendError(c, fiber.StatusUnauthorized, "Credenciales incorrectas", nil)
+	}
+
+	token, err := auth.Generate(usuario.ID, usuario.Email, usuario.Rol)
+	if err != nil {
+		return SendError(c, fiber.StatusInternalServerError, "No se pudo generar el token de sesión", nil)
+	}
+
+	return c.JSON(models.LoginResponse{Token: token, Email: usuario.Email, Rol: usuario.Rol})
 }

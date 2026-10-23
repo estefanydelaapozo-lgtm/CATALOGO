@@ -1,27 +1,54 @@
-// Seguimos dentro del paquete controllers, ya que maneja la lógica de otra sección del negocio.
 package controllers
 
 import (
-	// Importamos Fiber para manejar la respuesta HTTP.
+	"fmt"
+	"strconv"
+
 	"github.com/gofiber/fiber/v2"
-	// Importamos nuestro paquete de modelos para usar la estructura Producto.
-	"multicatalogo-backend/models"
+
+	"multicatalogo-backend/repository"
 )
 
-// GetProductos es la función controladora encargada de devolver el catálogo de artículos.
-func GetProductos(c *fiber.Ctx) error {
-	// Declaramos e inicializamos un 'slice' (arreglo dinámico) usando nuestro modelo models.Producto.
-	productos := []models.Producto{
-		// Agregamos el primer producto con sus respectivos valores para ID, Nombre, Precio e Img.
-		{ID: 1, Nombre: "Serum Revitalizante", Precio: 45.00, Img: "https://picsum.photos/seed/serum/150"},
-		// Agregamos el segundo producto a la lista.
-		{ID: 2, Nombre: "Crema Hidratante Pro", Precio: 32.50, Img: "https://picsum.photos/seed/crema/150"},
-		// Agregamos el tercer producto a la lista.
-		{ID: 3, Nombre: "Tónico Purificante", Precio: 28.00, Img: "https://picsum.photos/seed/tonico/150"},
-		// Agregamos el cuarto producto a la lista.
-		{ID: 4, Nombre: "Mascarilla Nocturna", Precio: 50.00, Img: "https://picsum.photos/seed/mascarilla/150"},
+// ProductoController recibe el repositorio y el caché por constructor.
+type ProductoController struct {
+	repo  repository.DBRepository
+	cache repository.CacheRepository
+}
+
+func NewProductoController(repo repository.DBRepository, cache repository.CacheRepository) *ProductoController {
+	return &ProductoController{repo: repo, cache: cache}
+}
+
+// GetProductos devuelve el catálogo completo (200), leído con Cache-Aside (Redis → PostgreSQL).
+// La cabecera X-Cache indica HIT (vino de Redis) o MISS (se consultó PostgreSQL).
+func (p *ProductoController) GetProductos(c *fiber.Ctx) error {
+	productos, hit, err := repository.CacheAside(c.UserContext(), p.cache,
+		repository.KeyProductos, repository.TTLProductos, p.repo.GetProductos)
+	if err != nil {
+		return dbError(c, err)
 	}
-	
-	// Fiber convierte automáticamente el slice de estructuras a formato JSON y lo envía como respuesta al cliente.
+	setCacheHeader(c, hit)
 	return c.JSON(productos)
+}
+
+// GetProductoPorID devuelve un producto.
+//
+//	400 -> el :id no es un entero positivo
+//	404 -> el producto no existe
+func (p *ProductoController) GetProductoPorID(c *fiber.Ctx) error {
+	raw := c.Params("id")
+	id, err := strconv.Atoi(raw)
+	if err != nil || id <= 0 {
+		return SendError(c, fiber.StatusBadRequest, "El id del producto debe ser un número entero positivo",
+			map[string]string{"id": raw})
+	}
+
+	producto, ok, err := p.repo.GetProductoByID(c.UserContext(), id)
+	if err != nil {
+		return dbError(c, err)
+	}
+	if !ok {
+		return SendError(c, fiber.StatusNotFound, fmt.Sprintf("El producto con id %d no existe", id), nil)
+	}
+	return c.JSON(producto)
 }

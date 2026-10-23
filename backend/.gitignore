@@ -1,0 +1,4 @@
+# Binarios y entorno Go
+*.exe
+*.out
+.env

@@ -1,66 +1,64 @@
-# MultiCatálogo — Frontend React conectado a API RESTful en Go
+# MultiCatálogo
 
-Proyecto (React + TypeScript + Vite + Tailwind) conectado al backend visto en clases (Go + Fiber).
+Proyecto dividido en dos partes:
 
 ```
-.
-├── backend/    API RESTful en Go (Fiber) — puerto 3000
-└── frontend/   Aplicación React (Vite) — puerto 5173
+MultiCatalogo/
+├── backend/    API en Go (Fiber) — puerto 3000
+└── frontend/   React 19 + Vite + Tailwind + React Router 7 + TypeScript
 ```
 
-## Endpoints consumidos
-
-| Método | Ruta             | Uso en el frontend                                     |
-|--------|------------------|--------------------------------------------------------|
-| POST   | `/api/login`     | `Login.tsx` — valida credenciales y devuelve el token  |
-| GET    | `/api/productos` | `Catalogo.tsx` — carga el catálogo de productos        |
-
-Credenciales de prueba: `admin@upse.edu.ec` / `123456`
-
-## Qué se cambió respecto al proyecto base (layout y enrutamiento)
-
-- **`frontend/src/services/api.ts`** (nuevo): capa de acceso a la API. Define la URL base (`VITE_API_URL` o `http://<host>:3000`), los tipos de respuesta, el error `ApiError` y las funciones `loginRequest()` y `getProductos()`.
-- **`Login.tsx`**: se reemplazó la validación hardcodeada por `POST /api/login`; muestra el error que devuelve el servidor, un estado de carga y un mensaje si no hay conexión.
-- **`AuthContext.tsx`**: `login(email, token)` ahora también guarda el token que entrega la API; `logout()` lo limpia.
-- **`Catalogo.tsx`**: los productos ya no están quemados en el código; se cargan con `GET /api/productos` dentro de `useEffect`, con estados de carga, error (botón *Reintentar*) y lista vacía.
-- **`backend/main.go`**: CORS ampliado para aceptar `localhost:5173` y `127.0.0.1:5173` además de la IP original, y se permite la cabecera `Authorization`.
-
-## Cómo ejecutarlo
-
-Necesitas dos terminales.
-
-**1. Backend** (Go instalado):
-
+## Backend
+Requiere Docker (PostgreSQL 16 + Redis).
 ```bash
 cd backend
+docker compose up -d      # levanta PostgreSQL (carga database/init.sql) y Redis
+go mod tidy               # solo la primera vez (descarga go-redis y genera go.sum)
 go run .
-# API escuchando en http://localhost:3000
 ```
+Opcional: la API también puede correr en Docker con `docker compose --profile full up -d --build`.
 
-**2. Frontend** (Node.js instalado):
+### Caché con Redis (Fase 3)
+`GET /api/productos` (5 min) y `GET /api/red` (10 min) usan el patrón Cache-Aside. La cabecera
+`X-Cache: HIT|MISS` indica si la respuesta vino de Redis o de PostgreSQL.
+```bash
+docker exec multicatalogo-redis redis-cli KEYS "*"                 # ver claves
+docker exec multicatalogo-redis redis-cli DEL productos:all        # invalidar el catálogo
+docker exec multicatalogo-redis redis-cli FLUSHALL                 # limpiar todo (útil entre demos)
+```
+> Con el caché activo, un `UPDATE` directo en PostgreSQL tarda hasta 5 min en verse en el catálogo
+> (hasta que expire el TTL); invalida la clave con el comando de arriba para verlo al instante.
 
+## Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
-# Abrir http://localhost:5173
 ```
 
-Si el backend corre en otro equipo/VM, crea `frontend/.env` (puedes copiar `frontend/.env.example`) con:
+El frontend se conecta al backend en `http://<host>:3000` (ver `frontend/src/config.js`).
+Más detalle del frontend en `frontend/README.md`.
 
-```
-VITE_API_URL=http://IP_DEL_BACKEND:3000
-```
-
-y agrega el origen del frontend en `AllowOrigins` de `backend/main.go`.
-
-## Subir al repositorio personal
-
+### Checkout transaccional (Fase 4)
+`POST /api/checkout` (requiere `Authorization: Bearer <token>` del login) guarda el pedido en una
+transacción ACID, descuenta stock y calcula las comisiones de la red (10 % / 5 % / 2 %) en una
+goroutine, sin hacer esperar al cliente. Al arrancar, la API aplica sola la migración
+`database/migracion_fase4.sql` (idempotente), no hace falta ejecutar SQL a mano.
 ```bash
-git init
-git add .
-git commit -m "Conecta el frontend React con la API RESTful en Go"
-git branch -M main
-git remote add origin https://github.com/TU_USUARIO/TU_REPOSITORIO.git
-git push -u origin main
+cd backend && go test ./controllers/ -v      # pruebas unitarias (sin BD)
 ```
+Demostrar el ROLLBACK (solo en clase): poner `FALLA_CHECKOUT=antes_items` en `backend/.env`, reiniciar
+`go run .` y comprar; la BD no debe tener ningún pedido nuevo. Para volver a empezar la demo ejecuta
+`database/reset_demo_fase4.sql` y `redis-cli FLUSHALL`.
+
+### Seguridad (JWT + bcrypt)
+- Passwords almacenados con **bcrypt** (migración `003_seguridad.sql` al arrancar).
+- Login emite un **JWT real** HS256 (`JWT_SECRET` en `.env`, claims `{sub,email,rol,iat,exp}`, TTL 2h).
+- Middleware `RequireAuth` protege `GET /api/red` y `POST /api/checkout`.
+- El checkout toma la identidad del **token** (`c.Locals`), no del email del body (anti-spoofing).
+- `/api/health` hace ping real a Postgres (503 si cae) y Redis (`degraded` si cae).
+- Frontend: sesión persistida en `localStorage` (`multicatalogo_sesion`).
+
+Cuentas de prueba (password `123456`):
+- `admin@upse.edu.ec`
+- `cliente@upse.edu.ec`

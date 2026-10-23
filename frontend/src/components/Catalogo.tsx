@@ -1,93 +1,111 @@
-import { useEffect, useState } from 'react';
-import { useCart, type Producto } from '../context/CartContext';
-import { getProductos } from '../services/api';
+// Catálogo del multicatálogo activo: búsqueda (?q=), categorías (?categoria=), orden y sugerencias.
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useCatalog } from "../context/CatalogContext";
+import { getProductos } from "../services/productosService";
+import { enCatalogo, norm } from "../data/catalogos";
+import { categorias, type Producto } from "../data/productos";
+import ProductCard from "./ProductCard";
+import Sugeridos from "./Sugeridos";
+import CatalogSwitcher from "./CatalogSwitcher";
 
 const Catalogo = () => {
-  const { addToCart } = useCart();
+  const { activo } = useCatalog();
+  const [params, setParams] = useSearchParams();
+  const [todos, setTodos] = useState<Producto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [orden, setOrden] = useState("relevancia");
 
-  // Estados para consumir la API: datos, carga y error
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
-  // Contador para poder reintentar la carga sin recargar la página
-  const [reintentos, setReintentos] = useState<number>(0);
+  const q = params.get("q") ?? "";
+  const visibles = activo.categorias.length ? activo.categorias : categorias;
+  const catParam = params.get("categoria") ?? "Todas";
+  const categoria = visibles.includes(catParam) ? catParam : "Todas";
 
-  // GET /api/productos: se ejecuta al montar el componente y cada vez que se pulsa "Reintentar"
   useEffect(() => {
-    let cancelado = false; // evita actualizar el estado si el componente ya se desmontó
-
     getProductos()
-      .then((data) => {
-        if (!cancelado) setProductos(data);
-      })
-      .catch((err: unknown) => {
-        if (!cancelado) {
-          setError(err instanceof Error ? err.message : 'No se pudieron cargar los productos');
-        }
-      })
-      .finally(() => {
-        if (!cancelado) setLoading(false);
-      });
+      .then(setTodos)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
 
-    return () => {
-      cancelado = true;
-    };
-  }, [reintentos]);
-
-  const handleReintentar = () => {
-    setError('');
-    setLoading(true);
-    setReintentos((n) => n + 1);
+  const setParam = (k: string, v: string) => {
+    const n = new URLSearchParams(params);
+    if (v && v !== "Todas") n.set(k, v); else n.delete(k);
+    setParams(n, { replace: true });
   };
 
+  const lista = useMemo(() => {
+    const t = norm(q.trim());
+    const r = todos.filter(
+      (p) =>
+        enCatalogo(activo, p) &&
+        (categoria === "Todas" || p.categoria === categoria) &&
+        (!t || norm(`${p.nombre} ${p.descripcion} ${p.categoria}`).includes(t))
+    );
+    if (orden === "precio-asc") r.sort((a, b) => a.precio - b.precio);
+    if (orden === "precio-desc") r.sort((a, b) => b.precio - a.precio);
+    if (orden === "nombre") r.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    return r;
+  }, [todos, activo, categoria, q, orden]);
+
+  if (loading) return <p className="text-center p-8 text-[#7d6f87]">Cargando catálogo…</p>;
+  if (error) return <p className="text-center p-8 text-[#6a1f4d]">{error}</p>;
+
   return (
-    <div>
-      <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-6">Catálogo de Productos</h1>
+    <div className="max-w-6xl mx-auto">
+      <CatalogSwitcher />
+      <p className="text-xs font-semibold uppercase tracking-widest text-[#82285f] mt-8">Catálogo {activo.nombre}</p>
+      <h1 className="font-display text-3xl md:text-5xl text-[#1f1727] mt-2">{activo.lema}</h1>
+      <p className="text-[#7d6f87] mt-2 mb-8">
+        {lista.length} producto(s){q && <> para «{q}»</>}
+      </p>
 
-      {loading && (
-        <div className="bg-white p-8 rounded-lg border border-slate-200 shadow-sm text-center">
-          <p className="text-slate-500">Cargando productos...</p>
-        </div>
-      )}
+      <div className="flex flex-col md:flex-row gap-3 mb-6">
+        <input
+          value={q}
+          onChange={(e) => setParam("q", e.target.value)}
+          placeholder="Filtrar este catálogo…"
+          className="flex-1 px-5 py-3 rounded-full bg-white ring-1 ring-[#e6dfea] focus:ring-2 focus:ring-[#9c4a9e] outline-none transition"
+        />
+        <select
+          value={orden}
+          onChange={(e) => setOrden(e.target.value)}
+          aria-label="Ordenar"
+          className="px-5 py-3 rounded-full bg-white ring-1 ring-[#e6dfea] focus:ring-2 focus:ring-[#9c4a9e] outline-none"
+        >
+          <option value="relevancia">Relevancia</option>
+          <option value="precio-asc">Precio: menor a mayor</option>
+          <option value="precio-desc">Precio: mayor a menor</option>
+          <option value="nombre">Nombre A–Z</option>
+        </select>
+      </div>
 
-      {!loading && error && (
-        <div className="bg-red-50 text-red-600 p-6 rounded-lg border border-red-200 text-center">
-          <p className="mb-4">{error}</p>
+      <div className="flex gap-2 overflow-x-auto no-scrollbar mb-8">
+        {["Todas", ...visibles].map((c) => (
           <button
-            onClick={handleReintentar}
-            className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 transition"
+            key={c}
+            onClick={() => setParam("categoria", c)}
+            className={`shrink-0 text-sm font-semibold px-4 py-1.5 rounded-full ring-1 transition ${
+              c === categoria ? "bg-[#82285f] text-white ring-[#82285f]" : "bg-white text-[#5f536a] ring-[#e6dfea] hover:ring-[#c9a6e4]"
+            }`}
           >
-            Reintentar
+            {c}
           </button>
-        </div>
-      )}
+        ))}
+      </div>
 
-      {!loading && !error && productos.length === 0 && (
-        <div className="bg-white p-8 rounded-lg border border-slate-200 shadow-sm text-center">
-          <p className="text-slate-500">No hay productos disponibles.</p>
+      {lista.length === 0 ? (
+        <div className="bg-white rounded-2xl ring-1 ring-[#e6dfea] p-10 text-center">
+          <p className="text-[#5f536a]">No encontramos productos con esa búsqueda.</p>
+          <button onClick={() => setParams({}, { replace: true })} className="mt-3 font-semibold text-[#82285f] hover:underline">
+            Limpiar filtros
+          </button>
+          <Sugeridos titulo="Quizá te interese" />
         </div>
-      )}
-
-      {!loading && !error && productos.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {productos.map((prod) => (
-            <div
-              key={prod.id}
-              className="bg-white rounded-lg overflow-hidden border border-slate-200 shadow-sm flex flex-col"
-            >
-              <img src={prod.img} alt={prod.nombre} className="w-full h-40 object-cover" />
-              <div className="p-4 flex flex-col flex-1">
-                <h3 className="font-semibold text-slate-700">{prod.nombre}</h3>
-                <p className="text-indigo-600 font-bold mt-2 mb-4">${prod.precio.toFixed(2)}</p>
-                <button
-                  onClick={() => addToCart(prod)}
-                  className="mt-auto w-full bg-slate-900 text-white py-2 rounded text-sm hover:bg-indigo-600 transition"
-                >
-                  Añadir al Carrito
-                </button>
-              </div>
-            </div>
-          ))}
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {lista.map((p) => <ProductCard key={p.id} p={p} />)}
         </div>
       )}
     </div>
