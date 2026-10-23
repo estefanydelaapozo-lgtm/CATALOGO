@@ -5,6 +5,7 @@ import { useAuth, type Rol } from "../context/AuthContext";
 import { API_URL } from "../config";
 import Logo from "./Logo";
 import LogoMark from "./LogoMark";
+import { AUTOR } from "../config";
 
 const Login = () => {
   const [email, setEmail] = useState<string>("");
@@ -82,7 +83,7 @@ const Login = () => {
           <LogoMark size={44} />
           <div>
             <p className="font-bold text-lg leading-tight">MultiCatálogo</p>
-            <p className="text-xs font-semibold tracking-wider text-[#9fd7f1]">Cosmética SUGGE</p>
+            <p className="text-xs font-semibold tracking-wider text-[#9fd7f1]">{AUTOR}</p>
           </div>
         </div>
 
@@ -111,7 +112,7 @@ const Login = () => {
           </ul>
         </div>
 
-        <p className="relative hidden lg:block text-xs text-[#dfcbf0]">© 2026 MultiCatálogo · Cosmética SUGGE</p>
+        <p className="relative hidden lg:block text-xs text-[#dfcbf0]">© 2026 MultiCatálogo · {AUTOR}</p>
       </aside>
 
       {/* Formulario */}
@@ -187,7 +188,7 @@ const Login = () => {
           </div>
         </div>
 
-        <p className="relative mt-6 text-xs text-[#5f536a] lg:hidden">© 2026 MultiCatálogo · Cosmética SUGGE</p>
+        <p className="relative mt-6 text-xs text-[#5f536a] lg:hidden">© 2026 MultiCatálogo · {AUTOR}</p>
       </main>
     </div>
   );

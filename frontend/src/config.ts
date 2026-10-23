@@ -5,3 +5,7 @@
 //   (así funciona en localhost y también desde otra máquina de la red).
 const desdeEntorno = (import.meta.env.VITE_API_URL as string | undefined)?.trim().replace(/\/+$/, "");
 export const API_URL = desdeEntorno || `http://${window.location.hostname}:3000`;
+
+// Nombre que aparece debajo de "MultiCatálogo" (menú lateral, barra superior y login).
+// Para cambiarlo, edita solo esta línea.
+export const AUTOR = "Estefany de la A";

@@ -2,6 +2,7 @@ import LogoMark from "./LogoMark";
 // src/components/Sidebar.tsx
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { AUTOR } from "../config";
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -109,7 +110,7 @@ const Sidebar = ({ isCollapsed, isMobileOpen, closeMobileMenu }: SidebarProps) =
         <LogoMark size={38} />
         <div className={`${isCollapsed ? "md:hidden" : ""}`}>
           <p className="font-bold text-base leading-tight text-white">MultiCatálogo</p>
-          <p className="text-[11px] font-semibold tracking-wider text-[#9fd7f1]">Cosmética SUGGE</p>
+          <p className="text-[11px] font-semibold tracking-wider text-[#9fd7f1]">{AUTOR}</p>
         </div>
       </div>
 
