@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"time"
 
 	"multicatalogo-backend/models"
@@ -135,6 +136,7 @@ func (r *PostgresRepo) CrearLiquidacion(ctx context.Context, referidoID int) (mo
 	if len(ids) == 0 {
 		return models.Liquidacion{}, errors.New("no hay comisiones pendientes")
 	}
+	total = math.Round(total*100) / 100 // evita residuos de coma flotante (centavos)
 
 	now := time.Now()
 	var liq models.Liquidacion

@@ -192,6 +192,14 @@ func (r *PostgresRepo) CambiarEstadoPedido(ctx context.Context, id int, nuevo st
 				return err
 			}
 		}
+		// El saldo acumulado de cada referido baja lo mismo que se revierte
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE referidos r SET saldo = GREATEST(r.saldo - x.monto, 0)
+			 FROM (SELECT referido_id, SUM(monto) AS monto FROM comisiones
+			       WHERE pedido_id=$1 AND estado='pendiente' GROUP BY referido_id) x
+			 WHERE r.id = x.referido_id`, id); err != nil {
+			return err
+		}
 		// Revertir comisiones pendientes
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE comisiones SET estado='revertida' WHERE pedido_id=$1 AND estado='pendiente'`, id); err != nil {

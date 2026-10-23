@@ -185,7 +185,7 @@ func (r *PostgresRepo) AcreditarComisiones(ctx context.Context, pedidoID int) er
 	var usuarioID int
 	err = tx.QueryRowContext(ctx,
 		`UPDATE pedidos SET comisiones_calculadas = TRUE
-		 WHERE id = $1 AND comisiones_calculadas = FALSE
+		 WHERE id = $1 AND comisiones_calculadas = FALSE AND estado <> 'cancelado'
 		 RETURNING total, usuario_id`, pedidoID,
 	).Scan(&total, &usuarioID)
 	if errors.Is(err, sql.ErrNoRows) {

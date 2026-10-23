@@ -44,23 +44,23 @@ const Confirmacion = () => {
           </p>
         </div>
 
-        <div className="p-8">
-          <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-            <div>
+        <div className="p-5 sm:p-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm">
+            <div className="min-w-0">
               <p className="text-[#7d6f87]">Cliente</p>
               <p className="font-semibold text-[#31283b]">{pedido.cliente.nombre}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[#7d6f87]">Fecha</p>
               <p className="font-semibold text-[#31283b]">{pedido.fecha}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[#7d6f87]">Correo</p>
-              <p className="font-semibold text-[#31283b]">{pedido.cliente.email}</p>
+              <p className="font-semibold text-[#31283b] break-all">{pedido.cliente.email}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[#7d6f87]">Ciudad</p>
-              <p className="font-semibold text-[#31283b]">{pedido.cliente.ciudad}</p>
+              <p className="font-semibold text-[#31283b] break-words">{pedido.cliente.ciudad}</p>
             </div>
           </div>
 
@@ -84,7 +84,7 @@ const Confirmacion = () => {
             </span>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <Link
               to="/tienda"
               className="flex-1 text-center bg-[#82285f] text-white font-semibold py-3 rounded-lg hover:bg-[#6a1f4d] transition"
