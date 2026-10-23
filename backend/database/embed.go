@@ -17,3 +17,9 @@ var MigracionSeguridad string
 //
 //go:embed 004_backoffice.sql
 var MigracionBackoffice string
+
+// InitSQL esquema base y datos semilla (usuarios, productos, referidos).
+// Solo se ejecuta automáticamente si la tabla usuarios aún no existe (BD nueva, ej. en Render).
+//
+//go:embed init.sql
+var InitSQL string

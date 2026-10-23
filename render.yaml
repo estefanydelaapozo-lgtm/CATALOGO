@@ -1,0 +1,74 @@
+# Blueprint de Render para MultiCatálogo (BD PostgreSQL + API Go + frontend PWA).
+# Uso: Render -> New -> Blueprint -> elegir este repositorio y la rama.
+databases:
+  - name: multicatalogo-db
+    databaseName: multicatalogo
+    user: multicatalogo
+    plan: free
+
+services:
+  # ---------- API (Go/Fiber en Docker) ----------
+  - type: web
+    name: multicatalogo-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: multicatalogo-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: multicatalogo-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: multicatalogo-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: multicatalogo-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: multicatalogo-db
+          property: database
+      - key: DB_SSLMODE
+        value: require
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_ENV
+        value: production
+      # URL pública del frontend (https://...onrender.com), sin "/" al final
+      - key: CORS_ORIGINS
+        sync: false
+
+  # ---------- Frontend React (sitio estático / PWA) ----------
+  - type: web
+    name: multicatalogo-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      # URL pública de la API (https://...onrender.com), sin "/" al final
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      # Las rutas de React Router (/tienda, /catalogo...) deben devolver index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      # El service worker nunca debe quedar cacheado, o la PWA no se actualiza
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /manifest.webmanifest
+        name: Cache-Control
+        value: no-cache

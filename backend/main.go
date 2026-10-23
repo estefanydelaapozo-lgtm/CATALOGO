@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"os/signal"
 	"strconv"
@@ -43,6 +44,15 @@ func run() error {
 			log.Println("conexión a PostgreSQL cerrada")
 		}
 	}()
+
+	// BD nueva (ej. PostgreSQL recién creado en Render): carga el esquema base y los datos semilla.
+	// Si la tabla usuarios ya existe NO se toca nada (init.sql contiene DROP TABLE).
+	var tablaUsuarios sql.NullString
+	if err := db.QueryRow(`SELECT to_regclass('public.usuarios')::text`).Scan(&tablaUsuarios); err == nil && !tablaUsuarios.Valid {
+		if err := config.Migrate(db, "init", database.InitSQL); err != nil {
+			return err
+		}
+	}
 
 	// Fase 4: crea/actualiza pedidos, pedido_items, comisiones, stock... (idempotente).
 	if err := config.Migrate(db, "fase4", database.MigracionFase4); err != nil {
@@ -109,8 +119,14 @@ func run() error {
 	// recover evita que un panic tumbe el servidor (lo convierte en un 500 estandarizado).
 	app.Use(recover.New())
 
+	// Orígenes permitidos: los de desarrollo + los de CORS_ORIGINS (separados por coma),
+	// ej. CORS_ORIGINS=https://multicatalogo-web.onrender.com
+	origenes := "http://localhost:5173, http://127.0.0.1:5173, http://192.168.110.84:5173"
+	if extra := config.Getenv("CORS_ORIGINS", ""); extra != "" {
+		origenes += ", " + extra
+	}
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "http://localhost:5173, http://127.0.0.1:5173, http://192.168.110.84:5173",
+		AllowOrigins: origenes,
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		// Permite que el navegador (fetch) lea X-Cache: HIT | MISS.
 		ExposeHeaders: "X-Cache",
